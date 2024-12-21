@@ -18,22 +18,22 @@ const MAX_DOTS = 5;
 
 const vowels = [
     // Top row
-    { label: "i", f1: 275, f2: 2585 },  // High front unrounded
-    { label: "y", f1: 276, f2: 2091 },  // High front rounded
-    { label: "u", f1: 291, f2: 779 },   // High back rounded
+    { label: "i", f1: 306, f2: 2456 },  // 
+    { label: "y", f1: 305, f2: 2046 },  // 
+    { label: "u", f1: 311, f2: 804 },   // 
 
     // Second row
-    { label: "e", f1: 405, f2: 2553 },  // Mid-high front unrounded
-    { label: "ø", f1: 409, f2: 1599 },  // Mid-high front rounded
-    { label: "o", f1: 415, f2: 842 },   // Mid-high back rounded
+    { label: "e", f1: 405, f2: 2553 },  // 
+    { label: "ø", f1: 409, f2: 1599 },  // 
+    { label: "o", f1: 415, f2: 842 },   // 
 
     // Third row
-    { label: "ɛ", f1: 614, f2: 2306 },  // Mid-low front unrounded
-    { label: "œ", f1: 599, f2: 1678 },  // Mid-low front rounded
-    { label: "ɔ", f1: 595, f2: 1144 },  // Mid-low back rounded
+    { label: "ɛ", f1: 614, f2: 2306 },  // 
+    { label: "œ", f1: 599, f2: 1678 },  // 
+    { label: "ɔ", f1: 595, f2: 1144 },  // 
 
     // Bottom row
-    { label: "a", f1: 830, f2: 1438 },  // Low front unrounded
+    { label: "a", f1: 830, f2: 1438 },  // 
 ];
 
 function drawVowelChart() {
