@@ -28,7 +28,7 @@ export class AudioProcessor {
             const source = this.audioContext.createMediaStreamSource(this.stream);
             this.analyser = this.audioContext.createAnalyser();
 
-            this.analyser.fftSize = 2048;
+            this.analyser.fftSize = 8*2048;
             this.analyser.smoothingTimeConstant = 0.5;
             this.analyser.minDecibels = -100;
             this.analyser.maxDecibels = -30;
