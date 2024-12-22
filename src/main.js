@@ -1,60 +1,119 @@
 import { Waveform } from './waveform.js';
 import { VowelChart } from './chart.js';
+import { AudioProcessor } from './audioProcessor.js';
+import { FormantDisplay } from './formantDisplay.js';
+import { FormantAnalyzer } from './formantAnalyzer.js';
 
-const startButton = document.getElementById('start-recording');
-const waveformCanvas = document.getElementById('waveform');
-const vowelCanvas = document.getElementById('vowel-chart');
-const tooltip = document.createElement('div'); // Tooltip for displaying F1/F2 values
+class App {
+    constructor() {
+        this.startButton = document.getElementById('start-recording');
+        this.waveformCanvas = document.getElementById('waveform');
+        this.vowelCanvas = document.getElementById('vowel-chart');
+        this.tooltip = document.getElementById('tooltip');
+        this.isRecording = false;
 
-// Initialize components
-const waveform = new Waveform(waveformCanvas);
-const vowelChart = new VowelChart(vowelCanvas);
+        // Amplitude threshold for formant calculation
+        this.AMPLITUDE_THRESHOLD = 0.01; // Adjust this value as needed
 
-vowelChart.drawChart();
+        // Initialize components
+        this.audioProcessor = new AudioProcessor();
+        this.formantAnalyzer = null;
+        this.formantDisplay = new FormantDisplay(
+            document.getElementById('f1'),
+            document.getElementById('f2')
+        );
+        this.waveform = new Waveform(this.waveformCanvas);
+        this.vowelChart = new VowelChart(this.vowelCanvas);
 
-// Style the tooltip
-tooltip.style.position = 'absolute';
-tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-tooltip.style.color = 'white';
-tooltip.style.padding = '5px 10px';
-tooltip.style.borderRadius = '5px';
-tooltip.style.pointerEvents = 'none';
-tooltip.style.fontSize = '14px';
-tooltip.style.display = 'none';
-document.body.appendChild(tooltip);
-
-// Start/stop waveform visualization
-startButton.addEventListener('click', () => {
-    if (!waveform.isRecording) {
-        waveform.start();
-        startButton.textContent = "Stop Recording";
-    } else {
-        waveform.stop();
-        startButton.textContent = "Start Recording";
+        this.vowelChart.drawChart();
+        this.attachEventListeners();
     }
-});
+    attachEventListeners() {
+        // Start/stop recording and visualization
+        this.startButton.addEventListener('click', () => this.toggleRecording());
 
-// Handle mouse movement on the vowel chart
-vowelCanvas.addEventListener('mousemove', (event) => {
-    // Get mouse position relative to the canvas
-    const rect = vowelCanvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
+        // Handle mouse movement for tooltip
+        this.vowelCanvas.addEventListener('mousemove', (event) => this.handleMouseMove(event));
+        this.vowelCanvas.addEventListener('mouseleave', () => this.handleMouseLeave());
+    }
+    async startRecording() {
+        try {
+            const sampleRate = await this.audioProcessor.start();
+            this.formantAnalyzer = new FormantAnalyzer(sampleRate);
 
-    // Map mouse position to F1/F2
-    const f2 = vowelChart.mapXToF2(mouseX);
-    const f1 = vowelChart.mapYToF1(mouseY);
+            this.waveform.start();
+            this.startButton.textContent = "Stop Recording";
+            this.isRecording = true;
 
-    // Update tooltip content and position
-    tooltip.textContent = `F1: ${Math.round(f1)} Hz, F2: ${Math.round(f2)} Hz`;
-    tooltip.style.left = `${event.pageX + 10}px`;
-    tooltip.style.top = `${event.pageY + 10}px`;
-    tooltip.style.display = 'block';
-});
+            this.updateFormantsRealtime();
+        } catch (err) {
+            console.error("Failed to start recording:", err);
+        }
+    }
 
-// Hide tooltip when the mouse leaves the canvas
-vowelCanvas.addEventListener('mouseleave', () => {
-    tooltip.style.display = 'none';
-});
+    stopRecording() {
+        this.audioProcessor.stop();
+        this.waveform.stop();
+        this.formantDisplay.reset();
+        this.isRecording = false;
+        this.startButton.textContent = "Start Recording";
+    }
 
-// window.addEventListener('resize', () => this.drawChart());
+    updateFormantsRealtime() {
+        if (!this.isRecording) return;
+
+        requestAnimationFrame(() => this.updateFormantsRealtime());
+
+        // Check amplitude first
+        const currentAmplitude = this.audioProcessor.getCurrentAmplitude();
+
+        if (currentAmplitude > this.AMPLITUDE_THRESHOLD) {
+            const frequencyData = this.audioProcessor.getFrequencyData();
+            if (frequencyData && this.formantAnalyzer) {
+                const [f1, f2] = this.formantAnalyzer.computeFormants(frequencyData);
+
+                // Only update if we have meaningful values
+                if (f1 > 150 && f2 > 700) {
+                    this.formantDisplay.update(Math.round(f1), Math.round(f2));
+                } else {
+                    this.formantDisplay.reset();
+                }
+            }
+        } else {
+            // Reset display when amplitude is too low
+            this.formantDisplay.reset();
+        }
+    }
+
+    toggleRecording() {
+        if (this.isRecording) {
+            this.stopRecording();
+        } else {
+            this.startRecording();
+        }
+    }
+    handleMouseMove(event) {
+        const rect = this.vowelCanvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        const f2 = this.vowelChart.mapXToF2(mouseX);
+        const f1 = this.vowelChart.mapYToF1(mouseY);
+
+        if (this.tooltip) {
+            this.tooltip.textContent = `F1: ${Math.round(f1)} Hz, F2: ${Math.round(f2)} Hz`;
+            this.tooltip.style.left = `${event.pageX + 10}px`;
+            this.tooltip.style.top = `${event.pageY + 10}px`;
+            this.tooltip.style.display = 'block';
+        }
+    }
+
+    handleMouseLeave() {
+        if (this.tooltip) {
+            this.tooltip.style.display = 'none';
+        }
+    }
+}
+
+// Initialize the app
+new App();

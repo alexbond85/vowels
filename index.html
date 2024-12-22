@@ -6,7 +6,7 @@
   <title>Vowel Trainer</title>
   <style>
     body {
-      background: linear-gradient(to bottom, #6a11cb, #2575fc); /* Gradient background */
+      background: linear-gradient(to bottom, #6a11cb, #2575fc);
       color: white;
       font-family: Arial, sans-serif;
       text-align: center;
@@ -14,7 +14,7 @@
     }
 
     h1 {
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       font-size: 24px;
     }
 
@@ -22,11 +22,12 @@
       background-color: #ff7e67;
       color: white;
       border: none;
-      padding: 15px 30px;
+      padding: 10px 20px;
       font-size: 16px;
       border-radius: 8px;
       cursor: pointer;
       transition: background-color 0.3s ease;
+      margin-bottom: 10px;
     }
 
     button:hover {
@@ -34,59 +35,41 @@
     }
 
     #formants {
-      background-color: rgba(255, 255, 255, 0.1);
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 16px;
-      margin-top: 10px;
-    }
-
-    .canvas-container {
-      margin: 20px auto;
+      background-color: rgba(28, 70, 96, 0.34); /* Tooltip-like background */
+      color: white;
+      padding: 8px 16px;
+      border-radius: 5px;
+      display: inline-block; /* Center and size it neatly */
+      font-size: 14px;
+      margin-top: 0px;
+      margin-bottom: 0px;
     }
 
     canvas {
+      margin: 10px auto; /* Reduced margin for closer spacing */
       display: block;
-      margin: 20px auto;
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 8px;
-      width: 90%; /* Adjust to parent width for responsiveness */
-      max-width: 600px;
-      height: auto;
     }
 
-    @media (max-width: 768px) {
-      button {
-        font-size: 14px;
-        padding: 12px 20px;
-      }
+    #waveform {
+      height: 80px; /* Slightly reduce height for better spacing */
+    }
 
-      h1 {
-        font-size: 20px;
-      }
-
-      #formants {
-        font-size: 14px;
-      }
-
-      canvas {
-        width: 100%; /* Stretch to full width on small screens */
-      }
+    #vowel-chart {
+      margin-top: 10px; /* Closer alignment to the formants */
     }
   </style>
 </head>
 <body>
 <h1>Interactive Vowel Trainer</h1>
 <button id="start-recording">Start Recording</button>
-<div id="formants">
-  Formant 1 (F1): <span id="f1">0</span> Hz, Formant 2 (F2): <span id="f2">0</span> Hz
-</div>
-<div class="canvas-container">
-  <canvas id="waveform" width="600" height="100"></canvas>
-</div>
-<div class="canvas-container">
-  <canvas id="vowel-chart" width="600" height="400"></canvas>
-</div>
+<canvas id="waveform" width="600" height="100"></canvas>
+<p id="formants">
+  Formant 1 (F1): <span id="f1">0</span> Hz,
+  Formant 2 (F2): <span id="f2">0</span> Hz
+</p>
+<canvas id="vowel-chart" width="600" height="400"></canvas>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
