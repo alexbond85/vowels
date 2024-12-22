@@ -2,7 +2,8 @@ export class AudioProcessor {
     constructor() {
         this.audioContext = null;
         this.analyser = null;
-        this.dataArray = null;
+        this.frequencyData = null;
+        this.timeData = null;  // For amplitude checking
         this.isRecording = false;
         this.stream = null;
         this.sampleRate = null;
@@ -20,11 +21,11 @@ export class AudioProcessor {
             const source = this.audioContext.createMediaStreamSource(this.stream);
             this.analyser = this.audioContext.createAnalyser();
 
-            // Match the successful configuration
             this.analyser.fftSize = 2048;
             this.analyser.smoothingTimeConstant = 0.8;
 
-            this.dataArray = new Float32Array(this.analyser.frequencyBinCount);
+            this.frequencyData = new Float32Array(this.analyser.frequencyBinCount);
+            this.timeData = new Float32Array(this.analyser.fftSize);  // For time domain data
 
             source.connect(this.analyser);
             this.isRecording = true;
@@ -48,24 +49,30 @@ export class AudioProcessor {
 
         this.audioContext = null;
         this.analyser = null;
-        this.dataArray = null;
+        this.frequencyData = null;
+        this.timeData = null;
         this.isRecording = false;
         this.sampleRate = null;
     }
 
     getFrequencyData() {
         if (!this.analyser || !this.isRecording) return null;
-        this.analyser.getFloatFrequencyData(this.dataArray);
-        return this.dataArray;
+        this.analyser.getFloatFrequencyData(this.frequencyData);
+        return this.frequencyData;
     }
 
-    // Add method to get average power for threshold detection
-    getAveragePower() {
-        if (!this.analyser || !this.isRecording) return -Infinity;
+    getCurrentAmplitude() {
+        if (!this.analyser || !this.isRecording) return 0;
 
-        const data = this.getFrequencyData();
-        if (!data) return -Infinity;
+        this.analyser.getFloatTimeDomainData(this.timeData);
 
-        return data.reduce((sum, val) => sum + val, 0) / data.length;
+        // Calculate RMS amplitude
+        let sumSquares = 0;
+        for (let i = 0; i < this.timeData.length; i++) {
+            sumSquares += this.timeData[i] * this.timeData[i];
+        }
+        const rms = Math.sqrt(sumSquares / this.timeData.length);
+
+        return rms;
     }
 }
