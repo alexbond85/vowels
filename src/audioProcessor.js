@@ -3,7 +3,6 @@ export class AudioProcessor {
         this.audioContext = null;
         this.analyser = null;
         this.dataArray = null;
-        this.timeDataArray = null;  // For amplitude checking
         this.isRecording = false;
         this.stream = null;
         this.sampleRate = null;
@@ -13,28 +12,19 @@ export class AudioProcessor {
         if (this.isRecording) return;
 
         try {
-            this.stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    sampleRate: 44100,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true
-                }
-            });
+            this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            this.audioContext = new AudioContext();
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             this.sampleRate = this.audioContext.sampleRate;
 
             const source = this.audioContext.createMediaStreamSource(this.stream);
             this.analyser = this.audioContext.createAnalyser();
 
-            this.analyser.fftSize = 8*2048;
-            this.analyser.smoothingTimeConstant = 0.5;
-            this.analyser.minDecibels = -100;
-            this.analyser.maxDecibels = -30;
+            // Match the successful configuration
+            this.analyser.fftSize = 2048;
+            this.analyser.smoothingTimeConstant = 0.8;
 
             this.dataArray = new Float32Array(this.analyser.frequencyBinCount);
-            this.timeDataArray = new Float32Array(this.analyser.fftSize);
 
             source.connect(this.analyser);
             this.isRecording = true;
@@ -59,7 +49,6 @@ export class AudioProcessor {
         this.audioContext = null;
         this.analyser = null;
         this.dataArray = null;
-        this.timeDataArray = null;
         this.isRecording = false;
         this.sampleRate = null;
     }
@@ -70,18 +59,13 @@ export class AudioProcessor {
         return this.dataArray;
     }
 
-    // New method to get current audio amplitude
-    getCurrentAmplitude() {
-        if (!this.analyser || !this.isRecording) return 0;
+    // Add method to get average power for threshold detection
+    getAveragePower() {
+        if (!this.analyser || !this.isRecording) return -Infinity;
 
-        this.analyser.getFloatTimeDomainData(this.timeDataArray);
+        const data = this.getFrequencyData();
+        if (!data) return -Infinity;
 
-        // Calculate RMS amplitude
-        let sum = 0;
-        for (let i = 0; i < this.timeDataArray.length; i++) {
-            sum += this.timeDataArray[i] * this.timeDataArray[i];
-        }
-        const rms = Math.sqrt(sum / this.timeDataArray.length);
-        return rms;
+        return data.reduce((sum, val) => sum + val, 0) / data.length;
     }
 }

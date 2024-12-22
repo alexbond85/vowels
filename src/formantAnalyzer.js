@@ -1,84 +1,66 @@
 export class FormantAnalyzer {
     constructor(sampleRate = 44100) {
         this.sampleRate = sampleRate;
-        // Use a smaller smoothing factor for more responsive updates
-        this.smoothingFactor = 0.5;
-        this.prevF1 = null;
-        this.prevF2 = null;
     }
 
     computeFormants(frequencyData) {
-        if (!frequencyData) return [0, 0];
+        const nyquist = this.sampleRate / 2;
+        const binSize = nyquist / frequencyData.length;
 
-        // Convert from dB to linear scale and normalize
-        const spectrum = this.normalizeSpectrum(frequencyData);
+        // Debug log the signal strength
+        const avgPower = frequencyData.reduce((sum, val) => sum + val, 0) / frequencyData.length;
+        console.log("Average power:", avgPower);
 
-        // Find formant peaks
-        const f1 = this.findFormantInRange(spectrum, 200, 900);
-        const f2 = this.findFormantInRange(spectrum, 750, 2600);
-
-        // Apply lighter temporal smoothing for more responsive updates
-        const smoothedF1 = this.smoothValue(f1, this.prevF1);
-        const smoothedF2 = this.smoothValue(f2, this.prevF2);
-
-        // Store current values for next frame
-        this.prevF1 = smoothedF1;
-        this.prevF2 = smoothedF2;
-
-        return [smoothedF1, smoothedF2];
-    }
-
-    normalizeSpectrum(frequencyData) {
-        const spectrum = new Float32Array(frequencyData.length);
-        let maxVal = -Infinity;
-        let minVal = Infinity;
-
-        // Find min and max values
+        // Convert to power spectrum
+        const powerSpectrum = new Float32Array(frequencyData.length);
         for (let i = 0; i < frequencyData.length; i++) {
-            const value = Math.pow(10, frequencyData[i] / 20);
-            maxVal = Math.max(maxVal, value);
-            minVal = Math.min(minVal, value);
+            powerSpectrum[i] = Math.pow(10, frequencyData[i] / 20);
         }
 
-        // Normalize with improved dynamic range
-        const range = maxVal - minVal;
-        if (range > 0) {
-            for (let i = 0; i < frequencyData.length; i++) {
-                const value = Math.pow(10, frequencyData[i] / 20);
-                spectrum[i] = (value - minVal) / range;
+        // Find peaks in specific frequency ranges
+        const f1Range = { min: 200, max: 1000 };
+        const f2Range = { min: 750, max: 2600 };
+
+        const f1Peak = this.findStrongestPeakInRange(powerSpectrum, binSize, f1Range, frequencyData);
+        const f2Peak = this.findStrongestPeakInRange(powerSpectrum, binSize, f2Range, frequencyData);
+
+        // Using the same threshold as your original code
+        if (f1Peak && f2Peak && f1Peak.power > -80 && f2Peak.power > -80) {
+            console.log("Found formants:", [f1Peak.frequency, f2Peak.frequency]);
+            return [f1Peak.frequency, f2Peak.frequency];
+        }
+        return null;  // Return null instead of [0, 0] to match original behavior
+    }
+
+    findStrongestPeakInRange(spectrum, binSize, range, rawData) {
+        const startBin = Math.floor(range.min / binSize);
+        const endBin = Math.ceil(range.max / binSize);
+        const windowSize = 2;  // Same window size as original
+
+        let maxPower = -Infinity;
+        let peakFreq = null;
+        let peakPower = null;
+
+        for (let i = startBin + windowSize; i < endBin - windowSize; i++) {
+            const centerValue = spectrum[i];
+            const centerPower = rawData[i];
+
+            // Check if it's a local maximum
+            let isPeak = true;
+            for (let j = -windowSize; j <= windowSize; j++) {
+                if (j !== 0 && spectrum[i + j] >= centerValue) {
+                    isPeak = false;
+                    break;
+                }
+            }
+
+            if (isPeak && centerValue > maxPower) {
+                maxPower = centerValue;
+                peakFreq = i * binSize;
+                peakPower = centerPower;
             }
         }
 
-        return spectrum;
-    }
-
-    findFormantInRange(spectrum, minFreq, maxFreq) {
-        const minBin = Math.floor((minFreq * spectrum.length * 2) / this.sampleRate);
-        const maxBin = Math.ceil((maxFreq * spectrum.length * 2) / this.sampleRate);
-
-        let maxVal = -Infinity;
-        let peakBin = -1;
-
-        // Find the highest peak in the range
-        for (let i = minBin; i < maxBin; i++) {
-            if (spectrum[i] > maxVal &&
-                i > 0 && i < spectrum.length - 1 &&
-                spectrum[i] > spectrum[i - 1] &&
-                spectrum[i] > spectrum[i + 1]) {
-                maxVal = spectrum[i];
-                peakBin = i;
-            }
-        }
-
-        if (peakBin !== -1) {
-            return (peakBin * this.sampleRate) / (spectrum.length * 2);
-        }
-
-        return this.prevF1 || 0; // Return previous value if no peak found
-    }
-
-    smoothValue(current, previous) {
-        if (previous === null) return current;
-        return this.smoothingFactor * previous + (1 - this.smoothingFactor) * current;
+        return peakFreq ? { frequency: peakFreq, power: peakPower } : null;
     }
 }

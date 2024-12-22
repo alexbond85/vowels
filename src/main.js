@@ -12,8 +12,8 @@ class App {
         this.tooltip = document.getElementById('tooltip');
         this.isRecording = false;
 
-        // Amplitude threshold for formant calculation
-        this.AMPLITUDE_THRESHOLD = 0.01; // Adjust this value as needed
+        // Power threshold for formant calculation (in dB)
+        this.POWER_THRESHOLD = -116;  // Made more sensitive for testing
 
         // Initialize components
         this.audioProcessor = new AudioProcessor();
@@ -28,14 +28,13 @@ class App {
         this.vowelChart.drawChart();
         this.attachEventListeners();
     }
-    attachEventListeners() {
-        // Start/stop recording and visualization
-        this.startButton.addEventListener('click', () => this.toggleRecording());
 
-        // Handle mouse movement for tooltip
+    attachEventListeners() {
+        this.startButton.addEventListener('click', () => this.toggleRecording());
         this.vowelCanvas.addEventListener('mousemove', (event) => this.handleMouseMove(event));
         this.vowelCanvas.addEventListener('mouseleave', () => this.handleMouseLeave());
     }
+
     async startRecording() {
         try {
             const sampleRate = await this.audioProcessor.start();
@@ -55,36 +54,32 @@ class App {
         this.audioProcessor.stop();
         this.waveform.stop();
         this.formantDisplay.reset();
+        this.vowelChart.clearHistory();  // Clear formant history
         this.isRecording = false;
         this.startButton.textContent = "Start Recording";
     }
-
     updateFormantsRealtime() {
         if (!this.isRecording) return;
 
         requestAnimationFrame(() => this.updateFormantsRealtime());
 
-        // Check amplitude first
-        const currentAmplitude = this.audioProcessor.getCurrentAmplitude();
+        const avgPower = this.audioProcessor.getAveragePower();
 
-        if (currentAmplitude > this.AMPLITUDE_THRESHOLD) {
+        if (avgPower > this.POWER_THRESHOLD) {
             const frequencyData = this.audioProcessor.getFrequencyData();
             if (frequencyData && this.formantAnalyzer) {
-                const [f1, f2] = this.formantAnalyzer.computeFormants(frequencyData);
+                const formants = this.formantAnalyzer.computeFormants(frequencyData);
 
-                // Only update if we have meaningful values
-                if (f1 > 150 && f2 > 700) {
+                if (formants) {
+                    const [f1, f2] = formants;
+                    // Update display
                     this.formantDisplay.update(Math.round(f1), Math.round(f2));
-                } else {
-                    this.formantDisplay.reset();
+                    // Update vowel chart with new formant point
+                    this.vowelChart.addFormantPoint(f1, f2);
                 }
             }
-        } else {
-            // Reset display when amplitude is too low
-            this.formantDisplay.reset();
         }
     }
-
     toggleRecording() {
         if (this.isRecording) {
             this.stopRecording();
@@ -92,6 +87,7 @@ class App {
             this.startRecording();
         }
     }
+
     handleMouseMove(event) {
         const rect = this.vowelCanvas.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
@@ -114,6 +110,5 @@ class App {
         }
     }
 }
-
 // Initialize the app
 new App();
