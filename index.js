@@ -14,27 +14,6 @@ const vowelCtx = vowelCanvas.getContext("2d");
 let audioContext, analyser, dataArray, bufferLength;
 let isRecording = false;
 let recentFormants = [];
-const MAX_DOTS = 5;
-
-const vowels = [
-    // Top row
-    { label: "i", f1: 306, f2: 2456 },  // 
-    { label: "y", f1: 305, f2: 2046 },  // 
-    { label: "u", f1: 311, f2: 804 },   // 
-
-    // Second row
-    { label: "e", f1: 405, f2: 2553 },  // 
-    { label: "ø", f1: 409, f2: 1599 },  // 
-    { label: "o", f1: 415, f2: 842 },   // 
-
-    // Third row
-    { label: "ɛ", f1: 614, f2: 2306 },  // 
-    { label: "œ", f1: 599, f2: 1678 },  // 
-    { label: "ɔ", f1: 595, f2: 1144 },  // 
-
-    // Bottom row
-    { label: "a", f1: 830, f2: 1438 },  // 
-];
 
 function drawVowelChart() {
     // Clear the entire canvas
