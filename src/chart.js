@@ -4,15 +4,15 @@ export class VowelChart {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
-        this.margin = 50;
+        this.margin = 30;
 
         // For formant history
         this.recentFormants = [];
-        this.MAX_DOTS = 5;
+        this.MAX_DOTS = 100; // Increased from 5 to show more points
 
-        // Store ranges for consistency
-        this.f1Range = { min: 250, max: 850 };
-        this.f2Range = { min: 750, max: 2600 };
+        // Updated ranges for F1 and F2
+        this.f1Range = { min: 270, max: 870 };
+        this.f2Range = { min: 650, max: 2700 };
 
         // Store vowel positions for click detection
         this.vowelPositions = new Map();
@@ -86,16 +86,24 @@ export class VowelChart {
         });
     }
 
-    addFormantPoint(f1, f2) {
-        if (f1 >= 200 && f1 <= 1000 && f2 >= 750 && f2 <= 2600) {
+    addFormantPoint(f1, f2, opacity = 1.0) {
+        // Check if formant values are within valid ranges
+        if (f1 >= this.f1Range.min && f1 <= this.f1Range.max &&
+            f2 >= this.f2Range.min && f2 <= this.f2Range.max) {
+
+            // Convert F1/F2 frequencies to canvas coordinates
             const x = this.mapF2ToX(f2);
             const y = this.mapF1ToY(f1);
-            this.recentFormants.push({ x, y, f1, f2, timestamp: Date.now() });
 
+            // Add new point to array
+            this.recentFormants.push({ x, y, f1, f2, opacity });
+
+            // If we exceed MAX_DOTS, remove oldest point
             if (this.recentFormants.length > this.MAX_DOTS) {
-                this.recentFormants.shift();
+                this.recentFormants.shift(); // removes first (oldest) element
             }
 
+            // Redraw the chart with updated points
             this.drawChartWithFormants();
         }
     }
@@ -107,13 +115,11 @@ export class VowelChart {
     }
 
     drawFormantPoints() {
+        // Draw each point in the array
         this.recentFormants.forEach((formant) => {
-            const age = (Date.now() - formant.timestamp) / 1000;
-            const alpha = Math.max(0, 1 - (age / 2));
-
             this.ctx.beginPath();
-            this.ctx.arc(formant.x, formant.y, 8, 0, 2 * Math.PI);
-            this.ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+            this.ctx.arc(formant.x, formant.y, 4, 0, 2 * Math.PI);
+            this.ctx.fillStyle = `rgba(255, 0, 0, ${formant.opacity})`;
             this.ctx.fill();
         });
     }
@@ -153,6 +159,7 @@ export class VowelChart {
         this.drawChart();
     }
 
+    // Updated mapping functions for new coordinate system
     mapF2ToX(f2) {
         const width = this.canvas.width - 2 * this.margin;
         return this.margin + width * (1 - (f2 - this.f2Range.min) / (this.f2Range.max - this.f2Range.min));
@@ -165,11 +172,17 @@ export class VowelChart {
 
     mapXToF2(x) {
         const width = this.canvas.width - 2 * this.margin;
-        return this.f2Range.min + (1 - (x - this.margin) / width) * (this.f2Range.max - this.f2Range.min);
+        return this.f2Range.max - ((x - this.margin) / width) * (this.f2Range.max - this.f2Range.min);
     }
 
     mapYToF1(y) {
         const height = this.canvas.height - 2 * this.margin;
         return this.f1Range.min + ((y - this.margin) / height) * (this.f1Range.max - this.f1Range.min);
+    }
+
+    clearHistory() {
+        // Clear all points
+        this.recentFormants = [];
+        this.drawChart();
     }
 }
