@@ -8,7 +8,7 @@ export class VowelChart {
 
         // For formant history
         this.recentFormants = [];
-        this.MAX_DOTS = 100; // Increased from 5 to show more points
+        this.MAX_DOTS = 300; // Increased from 5 to show more points
 
         // Updated ranges for F1 and F2
         this.f1Range = { min: 270, max: 870 };

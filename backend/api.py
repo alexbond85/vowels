@@ -2,21 +2,17 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import parselmouth
 import numpy as np
-import math
-import io
-import soundfile as sf
 from pydub import AudioSegment
-import tempfile
 import os
+import math
 import logging
+from datetime import datetime
 
-# Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,91 +21,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Create directories for original and converted files
+UPLOAD_FOLDER = "uploads"
+ORIGINAL_FOLDER = os.path.join(UPLOAD_FOLDER, "original")
+CONVERTED_FOLDER = os.path.join(UPLOAD_FOLDER, "converted")
+os.makedirs(ORIGINAL_FOLDER, exist_ok=True)
+os.makedirs(CONVERTED_FOLDER, exist_ok=True)
 
-def convert_audio_to_wav(audio_bytes):
-    """Convert audio to WAV format using pydub"""
-    try:
-        # Create temporary input file
-        with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as temp_in:
-            temp_in.write(audio_bytes)
-            temp_in_path = temp_in.name
 
-        # Create temporary output file
-        temp_out_path = temp_in_path + '.wav'
+def load_audio_mp3(file_path):
+    audio = AudioSegment.from_file(file_path)
+    audio = audio.set_channels(1)  # Convert to mono
+    audio = audio.set_frame_rate(44100)  # Set sample rate to 44100 Hz
 
-        # Convert to WAV
-        audio = AudioSegment.from_file(temp_in_path)
-        audio.export(temp_out_path, format='wav')
+    # Save the converted audio
+    converted_path = os.path.join(CONVERTED_FOLDER,
+                                  os.path.basename(file_path).replace('.webm', '.mp3'))
+    audio.export(converted_path, format='mp3')
+    logger.info(f"Saved converted audio to: {converted_path}")
 
-        # Read the converted WAV file
-        with open(temp_out_path, 'rb') as wav_file:
-            wav_bytes = wav_file.read()
+    samples = np.array(audio.get_array_of_samples(), dtype="float64") / (2 ** 15)  # Normalize
+    return samples, audio.frame_rate
 
-        return wav_bytes
 
-    except Exception as e:
-        logger.error(f"Error converting audio: {str(e)}")
-        raise
+def extract_formants(file_path):
+    samples, sample_rate = load_audio_mp3(file_path)
+    sound = parselmouth.Sound(samples, sampling_frequency=sample_rate)
+    formant = sound.to_formant_burg()
 
-    finally:
-        # Clean up temporary files
-        if os.path.exists(temp_in_path):
-            os.unlink(temp_in_path)
-        if os.path.exists(temp_out_path):
-            os.unlink(temp_out_path)
+    times = np.arange(0, formant.xmax, 0.01)
+
+    # Replace NaN values with None
+    f1 = [formant.get_value_at_time(1, t) for t in times]
+    f1 = [None if (val is None or math.isnan(val)) else val for val in f1]
+
+    f2 = [formant.get_value_at_time(2, t) for t in times]
+    f2 = [None if (val is None or math.isnan(val)) else val for val in f2]
+
+    return {"times": times.tolist(), "f1": f1, "f2": f2}
 
 
 @app.post("/analyze-formants")
 async def analyze_formants(audio: UploadFile = File(...)):
     try:
-        logger.info(f"Received audio file: {audio.filename}, content_type: {audio.content_type}")
+        # Generate timestamp for unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        original_filename = f"recording_{timestamp}.webm"
+        file_path = os.path.join(ORIGINAL_FOLDER, original_filename)
 
-        # Read the uploaded file
-        contents = await audio.read()
-        logger.info(f"Read {len(contents)} bytes")
+        # Save original file
+        with open(file_path, "wb") as buffer:
+            contents = await audio.read()
+            buffer.write(contents)
+        logger.info(f"Saved original file to: {file_path}")
 
-        # Convert to WAV if needed
-        if audio.filename.endswith('.webm') or audio.content_type == 'audio/webm':
-            logger.info("Converting WebM to WAV")
-            contents = convert_audio_to_wav(contents)
-            logger.info(f"Conversion complete, new size: {len(contents)} bytes")
-
-        # Create a BytesIO object for soundfile
-        with io.BytesIO(contents) as audio_bytes:
-            # Read audio data
-            logger.info("Reading audio data with soundfile")
-            samples, sample_rate = sf.read(audio_bytes)
-            logger.info(f"Audio read successfully: sample_rate={sample_rate}, shape={samples.shape}")
-
-            # Convert to mono if stereo
-            if len(samples.shape) > 1:
-                samples = samples.mean(axis=1)
-                logger.info("Converted stereo to mono")
-
-            # Create Praat Sound object and analyze
-            logger.info("Creating Praat Sound object")
-            sound = parselmouth.Sound(samples, sampling_frequency=sample_rate)
-            formant = sound.to_formant_burg()
-
-            # Extract formants
-            times = np.arange(0, formant.xmax, 0.03)
-            logger.info(f"Extracting formants for {len(times)} time points")
-
-            f1 = [formant.get_value_at_time(1, t) for t in times]
-            f1 = [None if (val is None or math.isnan(val)) else val for val in f1]
-
-            f2 = [formant.get_value_at_time(2, t) for t in times]
-            f2 = [None if (val is None or math.isnan(val)) else val for val in f2]
-
-            logger.info("Analysis complete")
+        # Process the file
+        try:
+            formant_data = extract_formants(file_path)
+            logger.info("Formant extraction successful")
             return {
                 "success": True,
-                "data": {
-                    "times": times.tolist(),
-                    "f1": f1,
-                    "f2": f2
-                }
+                "data": formant_data
             }
+        except Exception as e:
+            logger.error(f"Error extracting formants: {str(e)}")
+            raise
 
     except Exception as e:
         logger.error(f"Error processing audio: {str(e)}", exc_info=True)

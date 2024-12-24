@@ -15,7 +15,7 @@ class App {
         this.isRecording = false;
 
         // Initialize components
-        this.audioRecorder = new AudioRecorder(3000); // 3 second recordings
+        this.audioRecorder = new AudioRecorder(2000); // 3 second recordings
         this.formantAnalyzer = new FormantAnalyzer('http://localhost:8000');
         this.formantDisplay = new FormantDisplay(
             document.getElementById('f1'),
